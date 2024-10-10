@@ -23,6 +23,7 @@ local spells =
     the_devourer = require("spells/the_devourer"),  
     thunderspike = require("spells/thunderspike"),  
 	evade = require("spells/Evade"),
+	the_hunter = require("spells/the_hunter")
 }
 
 local my_utility = require("my_utility/my_utility")
@@ -63,6 +64,7 @@ on_render_menu(function ()
     spells.ravager.menu()
     spells.the_devourer.menu()
 	spells.evade.menu()
+	spells.the_hunter.menu();
     menu.main_tree:pop();
 
 end)
@@ -90,45 +92,7 @@ local boss_value = 20
 local last_check_time = 0.0 -- Time of last check for most hits
 local check_interval = 1.0 -- 1 second cooldown between checks
 
-local function check_and_update_best_target(unit, player_position, max_range)
-    local unit_position = unit:get_position()
-    local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position)
 
-    if distance_sqr < (max_range * max_range) then
-        local area_data = target_selector.get_most_hits_target_circular_area_light(unit_position, 5, 4, false)
-        
-        if area_data then
-            local total_score = 0
-            local n_normals = area_data.n_hits
-            local has_elite = unit:is_elite()
-            local has_champion = unit:is_champion()
-            local is_boss = unit:is_boss()
-
-            -- Skip single normal monsters unless there are more than the threshold
-            if n_normals < normal_monster_threshold:get() and not (has_elite or has_champion or is_boss) then
-                return -- Don't target single normal monsters or groups below threshold
-            end
-
-            -- Calculate score for normal monsters
-            total_score = n_normals * normal_monster_value
-
-            -- Add extra points for elite, champion, or boss
-            if is_boss then
-                total_score = total_score + boss_value
-            elseif has_champion then
-                total_score = total_score + champion_value
-            elseif has_elite then
-                total_score = total_score + elite_value
-            end
-
-            -- Prioritize based on score
-            if total_score > max_hits then
-                max_hits = total_score
-                best_target = unit
-            end
-        end
-    end
-end
 
 -- Updated function to get the closest valid enemy target
 local function closest_target(player_position, entity_list, max_range)
@@ -191,7 +155,7 @@ on_update(function ()
         entity_list);
 
     
-        
+      
        
     
     if target_selector_data.is_valid then
@@ -204,25 +168,35 @@ on_update(function ()
 	
 		-- Only update best_target if cooldown has expired
 		if current_time >= last_check_time + check_interval then
-			-- Use the already fetched entity_list here
-			local target_selector_data = my_target_selector.get_target_selector_data(
-				player_position, 
-				entity_list);
-	
-			if target_selector_data and target_selector_data.is_valid then
-				max_hits = 0
-				best_target = nil
-	
-				-- Check normal units and apply the priority-based logic
-				for _, unit in ipairs(target_selector_data.list) do
-					check_and_update_best_target(unit, player_position, max_range)
+			local closest = nil
+			local closest_dist_sqr = max_range * max_range
+			-- Check normal units and apply the priority-based logic
+			for _, unit in ipairs(target_selector_data.list) do
+				local has_elite = unit:is_elite()
+				local has_champion = unit:is_champion()
+				local is_boss = unit:is_boss()
+				
+				if is_boss or has_champion or has_elite then
+					best_target = unit;
+					break;
 				end
-	
-				-- Update last check time
-				last_check_time = current_time
+				
+				local unit_position = unit:get_position()
+				local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position)
+				if distance_sqr < closest_dist_sqr then
+					closest = unit
+					closest_dist_sqr = distance_sqr
+				end
 			end
+			if closest then
+				best_target = closest;
+			end
+			-- Update last check time
+			last_check_time = current_time
+			
 		end	
 		
+
 		if best_target then
 			local best_target_position = best_target:get_position();
 			local distance_sqr = best_target_position:squared_dist_to_ignore_z(player_position);
@@ -266,7 +240,7 @@ on_update(function ()
 		end
     end
 
-    if spells.evade  and cast_end_time < current_time and spells.evade.logics() then
+    if spells.evade  and cast_end_time + 0.2 < current_time and spells.evade.logics() then
 	end
 	
 	
