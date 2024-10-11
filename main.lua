@@ -27,8 +27,8 @@ local spells =
 }
 
 local my_utility = require("my_utility/my_utility")
-local normal_monster_threshold = slider_int:new(1, 10, 5, get_hash(my_utility.plugin_label .. "normal_monster_threshold"))
-
+local auto_play = checkbox:new(true, get_hash(my_utility.plugin_label .. "auto_play_bool_base"))
+local auto_play_range = slider_int:new(1, 20, 14, get_hash(my_utility.plugin_label .. "auto_play_range"))
 
 local function tablelength(T)
   local count = 0
@@ -56,8 +56,11 @@ on_render_menu(function ()
       menu.main_tree:pop();
       return;
     end;
- 
-    normal_monster_threshold:render("Normal Monster Threshold", "Threshold for considering normal monsters in target selection")
+	auto_play:render("Auto Play?", "")
+	if auto_play:get() == true then 
+		auto_play_range:render("Auto play range","")
+	end;
+    
     spells.armored_hide.menu()
     spells.concussive_stomp.menu()
     spells.counterattack.menu()
@@ -90,7 +93,7 @@ local boss_value = 20
 
 -- Cache for heavy function results
 local last_check_time = 0.0 -- Time of last check for most hits
-local check_interval = 1.0 -- 1 second cooldown between checks
+
 
 
 
@@ -137,10 +140,14 @@ on_update(function ()
 
     local player_position = get_player_position()
 
-    local screen_range = 16.0;
-
-    local collision_table = { false, 2.0 };
-    local floor_table = { true, 5.0 };
+    local screen_range = 20;
+	
+	if auto_play:get() == true then
+			screen_range = auto_play_range:get()
+		end
+	
+    local collision_table = { true, 1.0 };
+    local floor_table = { true, 5 };
     local angle_table = { false, 90.0 };
 
     local entity_list = my_target_selector.get_target_list(
@@ -160,87 +167,104 @@ on_update(function ()
     
     if target_selector_data.is_valid then
         
-		local is_auto_play_active = auto_play.is_active();
-		local max_range = 17.0;
-		if is_auto_play_active then
-			max_range = 12.0;
+		--local is_auto_play_active = auto_play.is_active();
+		local max_range = 14.0;
+		
+		if auto_play:get() == true then
+			max_range = auto_play_range:get()
 		end
 	
 		-- Only update best_target if cooldown has expired
-		if current_time >= last_check_time + check_interval then
+		
 			local closest = nil
 			local closest_dist_sqr = max_range * max_range
 			-- Check normal units and apply the priority-based logic
-			for _, unit in ipairs(target_selector_data.list) do
-				local has_elite = unit:is_elite()
-				local has_champion = unit:is_champion()
-				local is_boss = unit:is_boss()
-				
-				if is_boss or has_champion or has_elite then
-					best_target = unit;
-					break;
-				end
-				
+			for _, unit in ipairs(entity_list) do
 				local unit_position = unit:get_position()
-				local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position)
-				if distance_sqr < closest_dist_sqr then
-					closest = unit
-					closest_dist_sqr = distance_sqr
+				if target_selector.is_valid_enemy(unit) then
+					
+					local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position)
+					
+					local has_elite = unit:is_elite()
+					local has_champion = unit:is_champion()
+					local is_boss = unit:is_boss()
+					
+					if is_boss or has_champion or has_elite then
+						best_target = unit;
+						break;
+					end
+					
+					
+					if distance_sqr < closest_dist_sqr then
+						best_target = unit
+						closest_dist_sqr = distance_sqr
+						
+					end
 				end
-			end
-			if closest then
-				best_target = closest;
+				
 			end
 			-- Update last check time
+			
 			last_check_time = current_time
 			
-		end	
+		
 		
 
 		if best_target then
+		--console.print(best_target:get_skin_name())
 			local best_target_position = best_target:get_position();
 			local distance_sqr = best_target_position:squared_dist_to_ignore_z(player_position);
 		
-			if distance_sqr > (max_range * max_range) then            
-				return
-			end
-			
-			-- Prioritize the_hunter
-			if spells.the_hunter and spells.the_hunter.logics(best_target) then
-				cast_end_time = current_time + 0.2;
-				return
-			end
-			
-			-- Attempt to use Rushing Claw frequently
-			
-			-- Simplified spell casting
-			if spells.armored_hide and spells.armored_hide.logics() then
-				cast_end_time = current_time +0.1;
-				return
-			end
-			if spells.concussive_stomp and spells.concussive_stomp.logics(best_target) then
-				cast_end_time = current_time + 0.2;
-				return
-			end
-			if spells.counterattack and spells.counterattack.logics() then
-				cast_end_time = current_time + 0.1;
-				return
-			end
+			if distance_sqr < (max_range * max_range) then            
+				
 			
 			
-			if spells.the_devourer and spells.the_devourer.logics() then
-				cast_end_time = current_time + 0.2;
-				return
-			end
-			
-			if spells.ravager and spells.ravager.logics() then
-				cast_end_time = current_time + 0.1;
-				return
+				-- Prioritize the_hunter
+				if spells.the_hunter and spells.the_hunter.logics(best_target) then
+					cast_end_time = current_time + 0.2;
+					return
+				end
+				
+				-- Attempt to use Rushing Claw frequently
+				
+				-- Simplified spell casting
+				if spells.armored_hide and spells.armored_hide.logics() then
+					cast_end_time = current_time +0.1;
+					return
+				end
+				if spells.concussive_stomp and spells.concussive_stomp.logics(best_target) then
+					cast_end_time = current_time + 0.2;
+					return
+				end
+				if spells.counterattack and spells.counterattack.logics() then
+					cast_end_time = current_time + 0.1;
+					return
+				end
+				
+				
+				if spells.the_devourer and spells.the_devourer.logics() then
+					cast_end_time = current_time + 0.2;
+					return
+				end
+				
+				if spells.ravager and spells.ravager.logics() then
+					cast_end_time = current_time + 0.1;
+					return
+				end
+				
+				if auto_play:get() == true then 
+					if spells.evade and spells.evade.logics(best_target) then
+						cast_end_time = current_time + 0.1;
+						--console.print("AUTOPLAY")
+					end
+				end
+				
 			end
 		end
     end
-
-    if spells.evade  and cast_end_time + 0.2 < current_time and spells.evade.logics() then
+	
+    if auto_play:get() == false and spells.evade  and cast_end_time + 0.2 < current_time and spells.evade.logics() then
+	--console.print("NON AUTOPLAY")
 	end
 	
 	
