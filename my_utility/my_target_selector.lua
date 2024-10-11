@@ -337,10 +337,90 @@ local function get_target_selector_data(source, list)
 
 end
 
+
+local function dot2D(v1, v2)
+
+    return v1.x * v2.x + v1.y * v2.y
+end
+
+-- Function to calculate the squared magnitude of a 2D vector (x, y only)
+local function squaredMagnitude2D(v)
+
+    return v.x * v.x + v.y * v.y
+end
+
+-- Function to subtract two 2D vectors (ignoring z)
+local function subtract2D(v1, v2,field)
+	if field == true then 
+		local X1 = v1:x() - v2:x();
+		local V1 = v1:y() - v2:y();
+		return vec2:new(X1, V1)
+	end
+	
+	
+	local X1 = v1:x() - v2.x;
+	local V1 = v1:y() - v2.y;
+	return vec2:new(X1, V1)
+	
+end
+
+function CheckActorCollision(StartPoint, EndPoint, PositionToCheck, width)
+    -- Vector from A to B
+	--local StartPoint = vec2(2,1);
+	--StartPoint = vec2:new(StartPoint:x(),StartPoint:y())
+	--local temp = vec2.dot_product(StartPoint));
+	--console.print(StartPoint:x(),StartPoint:y()," Pos",PositionToCheck:x(),PositionToCheck:y());
+    local AB = subtract2D(EndPoint, StartPoint,true)
+    
+    -- Vector from A to C
+    local AC = subtract2D(PositionToCheck, StartPoint,true)
+	--console.print(AC.x);
+    -- Dot product of AB and AC
+	local dotProduct = dot2D(AB, AC)
+   -- local dotProduct = vec2:dot_product(AB, AC)
+	--console.print(dotProduct);
+    -- If dot product is negative, PositionToCheck is not between StartPoint and EndPoint
+    if dotProduct < 0 then
+        return false
+    end
+
+    -- If dot product exceeds AB's squared magnitude, PositionToCheck is beyond EndPoint
+    local AB_squaredMag = squaredMagnitude2D(AB)
+	--console.print(AB_squaredMag);
+    if dotProduct > AB_squaredMag then
+        return false
+    end
+
+    -- Now, calculate the perpendicular distance from C to the line segment AB
+    -- Projection scalar t = dot(AC, AB) / squaredMagnitude(AB)
+	
+    local t = dotProduct / AB_squaredMag
+	--console.print(t);
+
+    -- Project C onto the line AB: P = StartPoint + t * AB
+	local vecx = StartPoint:x() + t * AB.x
+	
+	local vecy = StartPoint:y() + t * AB.y
+    local P = vec2:new(vecx,vecy);
+    
+       
+   
+
+    -- Vector from C to P
+    local CP = subtract2D(PositionToCheck, P,false)
+	--console.print(CP.x,CP.y);
+    -- Distance from C to the line AB
+    local CP_distanceSquared = squaredMagnitude2D(CP)
+   --console.print(CP_distanceSquared)
+    -- If distance squared is less than the width squared, C is within the width tolerance
+    return CP_distanceSquared <= width * width
+end
+
 -- get target list with few parameters
 -- collision parameter table: {is_enabled(bool), width(float)};
 -- floor parameter table: {is_enabled(bool), height(float)};
 -- angle parameter table: {is_enabled(bool), max_angle(float)};
+local actor_table = { "Door","Block"}
 local function get_target_list(source, range, collision_table, floor_table, angle_table)
 
     local new_list = {}
@@ -354,6 +434,20 @@ local function get_target_list(source, range, collision_table, floor_table, angl
             if is_invalid then
                 goto continue;
             end
+			
+			all_objects = actors_manager.get_all_actors()
+			for _, obj in ipairs(all_objects) do
+				if not obj:is_enemy() and obj:is_interactable()then
+					local skin_name = obj:get_skin_name()
+					for _, pattern in ipairs(actor_table) do					
+						if skin_name:match(pattern) and CheckActorCollision(source,unit:get_position(),obj:get_position(),3) then
+						
+							goto continue;
+						end
+					end
+					
+				end
+			end
         end
 
         local unit_position = unit:get_position()

@@ -146,10 +146,10 @@ on_update(function ()
 			screen_range = auto_play_range:get()
 		end
 	
-    local collision_table = { true, 1.0 };
+    local collision_table = { true, 0.5 };
     local floor_table = { true, 5 };
     local angle_table = { false, 90.0 };
-
+	
     local entity_list = my_target_selector.get_target_list(
         player_position,
         screen_range, 
