@@ -348,28 +348,31 @@ local function get_target_list(source, range, collision_table, floor_table, angl
     
     for _, unit in ipairs(possible_targets_list) do
 
-        if collision_table.is_enabled then
-            local is_invalid = prediction.is_wall_collision(source, unit:get_position(), collision_table.width);
+        if collision_table[1] == true then
+			--console.print("lmao");
+            local is_invalid = prediction.is_wall_collision(source, unit:get_position(), collision_table[2]);
             if is_invalid then
                 goto continue;
             end
         end
 
         local unit_position = unit:get_position()
-
-        if floor_table.is_enabled then
-            local z_difference = math.abs(source.z() - unit_position:z())
-            local is_other_floor = z_difference > floor_table.height
-        
+				
+        if floor_table[1] == true then
+		 
+            local z_difference = math.abs(source:z() - unit_position:z())
+            local is_other_floor = z_difference > floor_table[2]
+			--console.print(z_difference);
             if is_other_floor then
+			
                 goto continue
             end
         end
 
-        if angle_table.is_enabled then
+        if angle_table[1] == true then
             local cursor_position = get_cursor_position();
             local angle = unit_position:get_angle(cursor_position, source);
-            local is_outside_angle = angle > floor_table.max_angle
+            local is_outside_angle = angle > floor_table[2]
         
             if is_outside_angle then
                 goto continue
